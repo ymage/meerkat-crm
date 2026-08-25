@@ -55,6 +55,8 @@ import { useTimelineEditing } from './hooks/useTimelineEditing';
 import { useReminderManagement } from './hooks/useReminderManagement';
 import { useRelationships } from './hooks/useRelationships';
 import AddRelationshipDialog from './components/AddRelationshipDialog';
+import { useEmploymentHistory } from './hooks/useEmploymentHistory';
+import AddEmploymentHistoryDialog from './components/AddEmploymentHistoryDialog';
 import { useSnackbar } from './context/SnackbarContext';
 import { ApiError } from './api/client';
 import { handleFetchError } from './utils/errorHandler';
@@ -196,6 +198,30 @@ export default function ContactDetailPage() {
     setEditingRelationship,
   } = useRelationships(id, { showError });
 
+  const refreshContact = useCallback(async () => {
+    if (!id) return;
+    try {
+      const contactData = await getContact(id, CONTACT_FIELDS);
+      setContact(contactData);
+    } catch (err) {
+      console.error('Error refreshing contact:', err);
+    }
+  }, [id]);
+
+  const {
+    entries: employmentHistory,
+    dialogOpen: employmentHistoryDialogOpen,
+    editingEntry: editingEmploymentHistoryEntry,
+    refreshEmploymentHistory,
+    handleSaveEntry: handleSaveEmploymentHistory,
+    handleEditEntry: handleEditEmploymentHistory,
+    handleDeleteEntry: handleDeleteEmploymentHistory,
+    handleEndEntry: handleEndEmploymentHistory,
+    handleAddEntry: handleAddEmploymentHistory,
+    setDialogOpen: setEmploymentHistoryDialogOpen,
+    setEditingEntry: setEditingEmploymentHistoryEntry,
+  } = useEmploymentHistory(id, { showError }, refreshContact);
+
   // Fetch available circles
   const fetchCircles = useCallback(async () => {
     try {
@@ -234,10 +260,11 @@ export default function ContactDetailPage() {
         setCustomFieldNames(user?.custom_field_names ?? []);
         setEnabledFields(resolveEnabledFields(user?.enabled_contact_fields ?? null));
 
-        // Second batch: refresh reminders and relationships in parallel
+        // Second batch: refresh reminders, relationships, and employment history in parallel
         await Promise.all([
           refreshReminders(),
-          refreshRelationships()
+          refreshRelationships(),
+          refreshEmploymentHistory()
         ]);
 
         // Only fetch profile picture if contact has one (avoid unnecessary 404)
@@ -271,7 +298,7 @@ export default function ContactDetailPage() {
         URL.revokeObjectURL(currentBlobUrl);
       }
     };
-  }, [id, refreshReminders, refreshRelationships]);
+  }, [id, refreshReminders, refreshRelationships, refreshEmploymentHistory]);
 
   // Combine and sort notes, activities, and completions for timeline
   const timelineItems: Array<{ type: 'note' | 'activity' | 'completion'; data: Note | Activity | ReminderCompletion; date: string }> = [
@@ -683,6 +710,11 @@ export default function ContactDetailPage() {
           onEditRelationship={handleEditRelationship}
           onDeleteRelationship={handleDeleteRelationship}
           customFieldNames={customFieldNames}
+          employmentHistory={employmentHistory}
+          onAddEmploymentHistory={handleAddEmploymentHistory}
+          onEditEmploymentHistory={handleEditEmploymentHistory}
+          onDeleteEmploymentHistory={handleDeleteEmploymentHistory}
+          onEndEmploymentHistory={handleEndEmploymentHistory}
         />
 
         {/* Timeline and Reminders Tabs */}
@@ -817,6 +849,16 @@ export default function ContactDetailPage() {
         onSave={handleSaveRelationship}
         relationship={editingRelationship}
         currentContactId={contact?.ID || 0}
+      />
+
+      <AddEmploymentHistoryDialog
+        open={employmentHistoryDialogOpen}
+        onClose={() => {
+          setEmploymentHistoryDialogOpen(false);
+          setEditingEmploymentHistoryEntry(null);
+        }}
+        onSave={handleSaveEmploymentHistory}
+        entry={editingEmploymentHistoryEntry}
       />
     </Box>
   );
