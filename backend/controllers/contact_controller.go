@@ -114,10 +114,11 @@ func GetContacts(c *gin.Context) {
 
 	// Parse relationships to include with validation
 	var relationshipMap = map[string]bool{
-		"notes":         false,
-		"activities":    false,
-		"relationships": false,
-		"reminders":     false,
+		"notes":              false,
+		"activities":         false,
+		"relationships":      false,
+		"reminders":          false,
+		"employment_history": false,
 	}
 	includes := c.Query("includes")
 	for _, rel := range strings.Split(includes, ",") {
@@ -190,6 +191,8 @@ func GetContacts(c *gin.Context) {
 				query = query.Preload("Relationships", "relationships.user_id = ?", userID)
 			case "reminders":
 				query = query.Preload("Reminders", "reminders.user_id = ?", userID)
+			case "employment_history":
+				query = query.Preload("EmploymentHistories", "employment_histories.user_id = ?", userID)
 			}
 		}
 	}
@@ -335,7 +338,8 @@ func GetContact(c *gin.Context) {
 			Preload("Notes", "notes.user_id = ?", userID).
 			Preload("Activities", "activities.user_id = ?", userID).
 			Preload("Relationships", "relationships.user_id = ?", userID).
-			Preload("Reminders", "reminders.user_id = ?", userID)
+			Preload("Reminders", "reminders.user_id = ?", userID).
+			Preload("EmploymentHistories", "employment_histories.user_id = ?", userID)
 	}
 
 	if err := query.First(&contact, id).Error; err != nil {
