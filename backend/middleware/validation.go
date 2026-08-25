@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 	"unicode"
 
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,7 @@ func init() {
 	// Register custom validators
 	validate.RegisterValidation("phone", validatePhone)
 	validate.RegisterValidation("birthday", validateBirthday)
+	validate.RegisterValidation("partialdate", validatePartialDate)
 	validate.RegisterValidation("strong_password", validateStrongPassword)
 	validate.RegisterValidation("unique_circles", validateUniqueCircles)
 	validate.RegisterValidation("no_at_sign", validateNoAtSign)
@@ -167,6 +169,26 @@ func validateBirthday(fl validator.FieldLevel) bool {
 
 	// Additional validation could check if date is valid
 	return true
+}
+
+// validatePartialDate validates date format YYYY, YYYY-MM, or YYYY-MM-DD
+func validatePartialDate(fl validator.FieldLevel) bool {
+	v := fl.Field().String()
+	if v == "" {
+		return true // Allow empty (use 'required' tag if needed)
+	}
+
+	match, _ := regexp.MatchString(`^\d{4}(-\d{2}(-\d{2})?)?$`, v)
+	if !match {
+		return false
+	}
+
+	for _, layout := range []string{"2006-01-02", "2006-01", "2006"} {
+		if _, err := time.Parse(layout, v); err == nil {
+			return true
+		}
+	}
+	return false
 }
 
 // validateStrongPassword checks password strength based on entropy
