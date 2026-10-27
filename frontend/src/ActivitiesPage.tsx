@@ -34,14 +34,16 @@ import { ListSkeleton } from './components/LoadingSkeletons';
 import { useDateFormat } from './DateFormatProvider';
 
 const ActivitiesPage: React.FC = () => {
-  const { t, i18n } = useTranslation();
-  const { formatDate, getDatePlaceholder } = useDateFormat();
+  const { t } = useTranslation();
+  const { formatDate, parseDateInput, autoFormatDateInput, getDatePlaceholder } = useDateFormat();
 
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebouncedValue(searchInput, 400);
   const [page, setPage] = useState(1);
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [fromDateInput, setFromDateInput] = useState('');
+  const [toDateInput, setToDateInput] = useState('');
+  const fromDate = useMemo(() => parseDateInput(fromDateInput) || '', [parseDateInput, fromDateInput]);
+  const toDate = useMemo(() => parseDateInput(toDateInput) || '', [parseDateInput, toDateInput]);
   const ACTIVITIES_PER_PAGE = 25;
 
   // Memoize params to prevent unnecessary refetching
@@ -67,6 +69,7 @@ const ActivitiesPage: React.FC = () => {
   } = useActivities(activityParams);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [editError, setEditError] = useState('');
   const [editValues, setEditValues] = useState<{
     activityTitle?: string;
     activityDescription?: string;
@@ -85,12 +88,12 @@ const ActivitiesPage: React.FC = () => {
   };
 
   const handleFromDateChange = (value: string) => {
-    setFromDate(value);
+    setFromDateInput(autoFormatDateInput(value, fromDateInput));
     setPage(1);
   };
 
   const handleToDateChange = (value: string) => {
-    setToDate(value);
+    setToDateInput(autoFormatDateInput(value, toDateInput));
     setPage(1);
   };
 
@@ -128,7 +131,8 @@ const ActivitiesPage: React.FC = () => {
 
   const handleEditClick = async (activity: Activity) => {
     setEditingActivity(activity);
-    
+    setEditError('');
+
     // Fetch all contacts if not already loaded
     if (allContacts.length === 0) {
       try {
@@ -143,7 +147,7 @@ const ActivitiesPage: React.FC = () => {
       activityTitle: activity.title || '',
       activityDescription: activity.description || '',
       activityLocation: activity.location || '',
-      activityDate: activity.date ? new Date(activity.date).toISOString().split('T')[0] : '',
+      activityDate: activity.date ? formatDate(activity.date) : '',
       activityContacts: activity.contacts || [],
     });
   };
@@ -151,12 +155,19 @@ const ActivitiesPage: React.FC = () => {
   const handleSaveEdit = async () => {
     if (!editingActivity || !editValues.activityTitle?.trim()) return;
 
+    const parsedDate = editValues.activityDate ? parseDateInput(editValues.activityDate) : '';
+    if (editValues.activityDate && !parsedDate) {
+      setEditError(t('activityDialog.dateError'));
+      return;
+    }
+    setEditError('');
+
     try {
       await updateActivity(editingActivity.ID, {
         title: editValues.activityTitle,
         description: editValues.activityDescription || '',
         location: editValues.activityLocation || '',
-        date: editValues.activityDate ? new Date(editValues.activityDate).toISOString() : new Date().toISOString(),
+        date: parsedDate ? new Date(parsedDate).toISOString() : new Date().toISOString(),
         contact_ids: editValues.activityContacts?.map(c => c.ID) || [],
       });
       setEditingActivity(null);
@@ -170,6 +181,7 @@ const ActivitiesPage: React.FC = () => {
   const handleCancelEdit = () => {
     setEditingActivity(null);
     setEditValues({});
+    setEditError('');
   };
 
   const handleDeleteActivity = async () => {
@@ -199,8 +211,19 @@ const ActivitiesPage: React.FC = () => {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 2, p: 2 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-        <Box display="flex" alignItems="center" gap={1}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          mb: 2
+        }}>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 1
+          }}>
           <Typography variant="h5">{t('activities.title')}</Typography>
           <IconButton
             size="small"
@@ -228,7 +251,12 @@ const ActivitiesPage: React.FC = () => {
       </Popover>
 
       <Paper sx={{ p: 1.5, mb: 2 }}>
-        <Box display="flex" gap={2} flexWrap="wrap">
+        <Box
+          sx={{
+            display: "flex",
+            gap: 2,
+            flexWrap: "wrap"
+          }}>
           <TextField
             size="small"
             label={t('activities.search')}
@@ -240,21 +268,19 @@ const ActivitiesPage: React.FC = () => {
           <TextField
             size="small"
             label={t('activities.fromDate')}
-            type="date"
-            value={fromDate}
+            placeholder={getDatePlaceholder()}
+            value={fromDateInput}
             onChange={(e) => handleFromDateChange(e.target.value)}
             variant="outlined"
-            slotProps={{ inputLabel: { shrink: true }, input: { placeholder: getDatePlaceholder(), lang: i18n.language } }}
             sx={{ width: 160 }}
           />
           <TextField
             size="small"
             label={t('activities.toDate')}
-            type="date"
-            value={toDate}
+            placeholder={getDatePlaceholder()}
+            value={toDateInput}
             onChange={(e) => handleToDateChange(e.target.value)}
             variant="outlined"
-            slotProps={{ inputLabel: { shrink: true }, input: { placeholder: getDatePlaceholder(), lang: i18n.language } }}
             sx={{ width: 160 }}
           />
         </Box>
@@ -264,7 +290,9 @@ const ActivitiesPage: React.FC = () => {
         <ListSkeleton count={8} />
       ) : activities.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="body1" color="text.secondary">
+          <Typography variant="body1" sx={{
+            color: "text.secondary"
+          }}>
             {hasFilters ? t('activities.noResults') : t('activities.noActivities')}
           </Typography>
         </Paper>
@@ -272,7 +300,11 @@ const ActivitiesPage: React.FC = () => {
         <Timeline position="right">
           {activities.map((activity, index) => (
             <TimelineItem key={activity.ID}>
-              <TimelineOppositeContent color="text.secondary" sx={{ flex: 0.2 }}>
+              <TimelineOppositeContent
+                sx={{
+                  color: "text.secondary",
+                  flex: 0.2
+                }}>
                 <Typography variant="body2">
                   {formatDate(activity.date)}
                 </Typography>
@@ -294,14 +326,21 @@ const ActivitiesPage: React.FC = () => {
                   }}
                 >
                   <Box>
-                    <Box display="flex" justifyContent="space-between" alignItems="flex-start">
+                    <Box
+                      sx={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "flex-start"
+                      }}>
                       <Box sx={{ flex: 1, pr: 2 }}>
                         {activity.title && (
                           <Typography
                             variant="body2"
-                            fontWeight={600}
-                            sx={{ wordBreak: 'break-word', color: 'text.primary' }}
-                          >
+                            sx={{
+                              fontWeight: 600,
+                              wordBreak: 'break-word',
+                              color: 'text.primary'
+                            }}>
                             {activity.title}
                           </Typography>
                         )}
@@ -309,7 +348,13 @@ const ActivitiesPage: React.FC = () => {
                           {activity.description}
                         </Typography>
                         {activity.location && (
-                          <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: "text.secondary",
+                              mt: 1,
+                              display: 'block'
+                            }}>
                             📍 {activity.location}
                           </Typography>
                         )}
@@ -324,7 +369,13 @@ const ActivitiesPage: React.FC = () => {
                       </Box>
                     </Box>
                     {activity.contacts && activity.contacts.length > 0 && (
-                      <Box mt={1} display="flex" flexWrap="wrap" gap={0.5}>
+                      <Box
+                        sx={{
+                          mt: 1,
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 0.5
+                        }}>
                         {activity.contacts.map((contact: Contact) => (
                           <Chip
                             key={contact.ID}
@@ -347,7 +398,12 @@ const ActivitiesPage: React.FC = () => {
       )}
 
       {totalPages > 1 && (
-        <Box display="flex" justifyContent="center" mt={3}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            mt: 3
+          }}>
           <Pagination
             color="primary"
             count={totalPages}
@@ -373,8 +429,12 @@ const ActivitiesPage: React.FC = () => {
           onDelete={handleDeleteActivity}
           type="activity"
           values={editValues}
-          onChange={setEditValues}
+          onChange={(newValues) => {
+            setEditValues(newValues);
+            setEditError('');
+          }}
           allContacts={allContacts}
+          dateError={editError}
         />
       )}
     </Box>

@@ -53,6 +53,9 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 			protected.PATCH("/users/custom-fields", middleware.ValidateJSONMiddleware(&models.CustomFieldNamesInput{}), controllers.UpdateCustomFieldNames)
 			protected.GET("/users/enabled-contact-fields", controllers.GetEnabledContactFields)
 			protected.PATCH("/users/enabled-contact-fields", middleware.ValidateJSONMiddleware(&models.EnabledContactFieldsInput{}), controllers.UpdateEnabledContactFields)
+			protected.PATCH("/users/contact-field-display", middleware.ValidateJSONMiddleware(&models.ContactFieldDisplayInput{}), controllers.UpdateContactFieldDisplay)
+			protected.GET("/users/carddav-circle-filter", controllers.GetCardDAVCircleFilter)
+			protected.PATCH("/users/carddav-circle-filter", middleware.ValidateJSONMiddleware(&models.CardDAVCircleFilterInput{}), controllers.UpdateCardDAVCircleFilter)
 			protected.GET("/users/me", controllers.GetCurrentUser)
 
 			// Contact routes
@@ -60,12 +63,16 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 			protected.GET("/contacts/circles", controllers.GetCircles)
 			protected.GET("/contacts/random", controllers.GetContactsRandom)
 			protected.GET("/contacts/birthdays", controllers.GetUpcomingBirthdays)
+			protected.GET("/contacts/duplicates", controllers.GetDuplicateContacts)
+			protected.POST("/contacts/duplicates/dismiss", middleware.ValidateJSONMiddleware(&models.DuplicateDismissInput{}), controllers.DismissDuplicateContacts)
 			protected.POST("/contacts", middleware.ValidateJSONMiddleware(&models.ContactInput{}), controllers.CreateContact)
 			protected.GET("/contacts/:id", controllers.GetContact)
 			protected.PUT("/contacts/:id", middleware.ValidateJSONMiddleware(&models.ContactInput{}), controllers.UpdateContact)
 			protected.DELETE("/contacts/:id", controllers.DeleteContact)
 			protected.POST("/contacts/:id/archive", controllers.ArchiveContact)
 			protected.POST("/contacts/:id/unarchive", controllers.UnarchiveContact)
+			protected.GET("/contacts/:id/merge-preview", controllers.GetContactMergePreview)
+			protected.POST("/contacts/:id/merge", middleware.ValidateJSONMiddleware(&models.ContactMergeInput{}), controllers.MergeContact)
 
 			// Contact import routes (CSV)
 			protected.POST("/contacts/import/upload", controllers.UploadCSVForImport)
@@ -145,6 +152,9 @@ func RegisterRoutes(router *gin.Engine, cfg *config.Config, db *gorm.DB, oidcPro
 			protected.GET("/export", controllers.ExportData)
 			protected.GET("/export/vcf", func(c *gin.Context) {
 				controllers.ExportContactsAsVCF(c, cfg.ProfilePhotoDir)
+			})
+			protected.GET("/contacts/:id/vcf", func(c *gin.Context) {
+				controllers.ExportContactAsVCF(c, cfg.ProfilePhotoDir)
 			})
 
 			// Graph/Network visualization route

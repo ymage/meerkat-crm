@@ -12,6 +12,7 @@ import {
   archiveContact,
   unarchiveContact
 } from './api/contacts';
+import { exportContactAsVcf } from './api/export';
 import { getCurrentUser } from './api/admin';
 import { resolveEnabledFields, ContactFieldKey } from './contactFields';
 import { 
@@ -25,8 +26,12 @@ import {
 import {
   ReminderCompletion,
   getCompletionsForContact,
-  deleteCompletion
+  deleteCompletion,
+  createReminder,
+  updateReminder,
+  deleteReminder
 } from './api/reminders';
+import { computeNextBirthdayOccurrence, findBirthdayReminder, buildBirthdayReminderPayload } from './utils/birthdayReminder';
 import {
   Box,
   Card,
@@ -55,6 +60,7 @@ import { useTimelineEditing } from './hooks/useTimelineEditing';
 import { useReminderManagement } from './hooks/useReminderManagement';
 import { useRelationships } from './hooks/useRelationships';
 import AddRelationshipDialog from './components/AddRelationshipDialog';
+import MergeContactsDialog from './components/MergeContactsDialog';
 import { useSnackbar } from './context/SnackbarContext';
 import { ApiError } from './api/client';
 import { handleFetchError } from './utils/errorHandler';
@@ -73,14 +79,14 @@ const CONTACT_FIELDS = [
   'circles', 'photo', 'custom_fields', 'archived',
   'emails', 'phones', 'addresses', 'urls', 'impps',
   'prefix', 'middle_name', 'suffix', 'organization', 'department',
-  'job_title', 'role', 'anniversary'
+  'job_title', 'role', 'anniversary', 'is_deceased', 'deceased_date'
 ];
 
 export default function ContactDetailPage() {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { showError } = useSnackbar();
+  const { showError, showSnackbar } = useSnackbar();
   const { formatBirthdayForInput, parseBirthdayInput, autoFormatBirthdayInput } = useDateFormat();
   const [contact, setContact] = useState<ContactWithRelations | null>(null);
   const [profilePic, setProfilePic] = useState<string>('');
@@ -114,12 +120,16 @@ export default function ContactDetailPage() {
 
   // Profile picture upload state
   const [profilePictureDialogOpen, setProfilePictureDialogOpen] = useState(false);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
+  // Bumped to refetch everything after this contact absorbed another one
+  const [reloadKey, setReloadKey] = useState(0);
 
   // Custom field names
   const [customFieldNames, setCustomFieldNames] = useState<string[]>([]);
 
   // Enabled extended contact fields (UI visibility)
   const [enabledFields, setEnabledFields] = useState<Set<ContactFieldKey>>(() => resolveEnabledFields(null));
+  const [hideEmptyFields, setHideEmptyFields] = useState(false);
 
   // Unified refresh function for notes, activities, and completions
   const refreshNotesAndActivities = async () => {
@@ -233,6 +243,7 @@ export default function ContactDetailPage() {
         setCompletions(completionsData || []);
         setCustomFieldNames(user?.custom_field_names ?? []);
         setEnabledFields(resolveEnabledFields(user?.enabled_contact_fields ?? null));
+        setHideEmptyFields(user?.hide_empty_contact_fields ?? false);
 
         // Second batch: refresh reminders and relationships in parallel
         await Promise.all([
@@ -271,7 +282,7 @@ export default function ContactDetailPage() {
         URL.revokeObjectURL(currentBlobUrl);
       }
     };
-  }, [id, refreshReminders, refreshRelationships]);
+  }, [id, reloadKey, refreshReminders, refreshRelationships]);
 
   // Combine and sort notes, activities, and completions for timeline
   const timelineItems: Array<{ type: 'note' | 'activity' | 'completion'; data: Note | Activity | ReminderCompletion; date: string }> = [
@@ -374,6 +385,7 @@ export default function ContactDetailPage() {
     }
 
     try {
+      const previousBirthday = field === 'birthday' ? contact.birthday : undefined;
       const updatedContact = await updateContact(id!, {
         ...contact,
         [field]: valueToSave
@@ -382,12 +394,56 @@ export default function ContactDetailPage() {
       setEditingField(null);
       setEditValue('');
       setValidationError('');
+
+      if (field === 'birthday' && previousBirthday) {
+        const existingReminder = findBirthdayReminder(reminders, previousBirthday);
+        if (existingReminder) {
+          if (!valueToSave) {
+            await deleteReminder(existingReminder.ID);
+            await refreshReminders();
+          } else {
+            const nextOccurrence = computeNextBirthdayOccurrence(valueToSave);
+            if (nextOccurrence) {
+              await updateReminder(existingReminder.ID, { remind_at: nextOccurrence.toISOString() });
+              await refreshReminders();
+            }
+          }
+        }
+      }
     } catch (err) {
       console.error('Error updating contact:', err);
       if (err instanceof ApiError) {
         const errorMessage = err.getDisplayMessage();
         setValidationError(errorMessage);
         showError(errorMessage);
+      } else {
+        showError(t('contactDetail.updateError'));
+      }
+    }
+  };
+
+  const handleToggleBirthdayReminder = async () => {
+    if (!contact || !contact.birthday) return;
+
+    const existingReminder = findBirthdayReminder(reminders, contact.birthday);
+    try {
+      if (existingReminder) {
+        await deleteReminder(existingReminder.ID);
+      } else {
+        const payload = buildBirthdayReminderPayload(
+          contact.ID,
+          contact.birthday,
+          t('reminders.birthdayMessage', { name: `${contact.firstname} ${contact.lastname}` })
+        );
+        if (payload) {
+          await createReminder(contact.ID, payload);
+        }
+      }
+      await refreshReminders();
+    } catch (err) {
+      console.error('Error toggling birthday reminder:', err);
+      if (err instanceof ApiError) {
+        showError(err.getDisplayMessage());
       } else {
         showError(t('contactDetail.updateError'));
       }
@@ -554,6 +610,31 @@ export default function ContactDetailPage() {
     }
   };
 
+  const handleMerged = (merged: Contact) => {
+    setMergeDialogOpen(false);
+    showSnackbar(t('contacts.merge.success'), 'success');
+    if (String(merged.ID) === id) {
+      setReloadKey(key => key + 1);
+    } else {
+      navigate(`/contacts/${merged.ID}`);
+    }
+  };
+
+  const handleExportVcard = async () => {
+    if (!id) return;
+
+    try {
+      await exportContactAsVcf(id);
+    } catch (err) {
+      console.error('Error exporting contact as vCard:', err);
+      if (err instanceof ApiError) {
+        showError(err.getDisplayMessage());
+      } else {
+        showError(t('contactDetail.exportVcardError'));
+      }
+    }
+  };
+
   const handleUnarchiveContact = async () => {
     if (!contact || !id) return;
 
@@ -650,6 +731,8 @@ export default function ContactDetailPage() {
         onStayInTouch={contact.archived ? undefined : handleStayInTouch}
         onArchiveContact={contact.archived ? undefined : handleArchiveContact}
         onUnarchiveContact={contact.archived ? handleUnarchiveContact : undefined}
+        onExportVcard={handleExportVcard}
+        onMergeContact={() => setMergeDialogOpen(true)}
       />
 
       {/* General Information and Timeline - Two Column Layout */}
@@ -660,6 +743,7 @@ export default function ContactDetailPage() {
       }}>
         {/* General Information */}
         <ContactInformation
+          key={contact.ID}
           contact={contact}
           editingField={editingField}
           editValue={editValue}
@@ -677,12 +761,15 @@ export default function ContactDetailPage() {
           }}
           onUpdateContact={handleUpdateContactFields}
           enabledFields={enabledFields}
+          hideEmptyFields={hideEmptyFields}
           relationships={relationships}
           incomingRelationships={incomingRelationships}
           onAddRelationship={handleAddRelationship}
           onEditRelationship={handleEditRelationship}
           onDeleteRelationship={handleDeleteRelationship}
           customFieldNames={customFieldNames}
+          reminders={reminders}
+          onToggleBirthdayReminder={handleToggleBirthdayReminder}
         />
 
         {/* Timeline and Reminders Tabs */}
@@ -799,6 +886,15 @@ export default function ContactDetailPage() {
           values={editTimelineValues}
           onChange={setEditTimelineValues}
           allContacts={allContacts}
+        />
+      )}
+
+      {mergeDialogOpen && (
+        <MergeContactsDialog
+          open
+          onClose={() => setMergeDialogOpen(false)}
+          contactId={contact.ID}
+          onMerged={handleMerged}
         />
       )}
 

@@ -1,4 +1,4 @@
-import { Box, Card, CardContent, Avatar, Typography, Chip, IconButton, Stack, TextField, Autocomplete, Button } from '@mui/material';
+import { Box, Card, CardContent, Avatar, Typography, Chip, IconButton, Stack, TextField, Autocomplete, Button, Tooltip } from '@mui/material';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
@@ -8,6 +8,8 @@ import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import AutoModeIcon from '@mui/icons-material/AutoMode';
 import ArchiveIcon from '@mui/icons-material/Archive';
 import UnarchiveIcon from '@mui/icons-material/Unarchive';
+import ContactMailIcon from '@mui/icons-material/ContactMail';
+import CallMergeIcon from '@mui/icons-material/CallMerge';
 import { useTranslation } from 'react-i18next';
 import { ContactFieldKey, resolveEnabledFields } from '../contactFields';
 
@@ -54,6 +56,8 @@ interface ContactHeaderProps {
   onStayInTouch?: () => void;
   onArchiveContact?: () => void;
   onUnarchiveContact?: () => void;
+  onExportVcard?: () => void;
+  onMergeContact?: () => void;
 }
 
 export default function ContactHeader({
@@ -77,7 +81,9 @@ export default function ContactHeader({
   onUploadProfilePicture,
   onStayInTouch,
   onArchiveContact,
-  onUnarchiveContact
+  onUnarchiveContact,
+  onExportVcard,
+  onMergeContact
 }: ContactHeaderProps) {
   const { t } = useTranslation();
   const enabled = enabledFields ?? resolveEnabledFields(null);
@@ -195,7 +201,9 @@ export default function ContactHeader({
                   value={profileValues.gender}
                   onChange={(e) => onProfileValueChange({ ...profileValues, gender: e.target.value })}
                   size="small"
-                  SelectProps={{ native: true }}
+                  slotProps={{
+                    select: { native: true }
+                  }}
                 >
                   <option value=""></option>
                   <option value="male">{t('contactDetail.male')}</option>
@@ -261,7 +269,21 @@ export default function ContactHeader({
                       <EditIcon fontSize="small" />
                     </IconButton>
                   </Box>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                    {onExportVcard && (
+                      <Tooltip title={t('contactDetail.exportVcard')}>
+                        <IconButton size="small" onClick={() => onExportVcard()}>
+                          <ContactMailIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {onMergeContact && (
+                      <Tooltip title={t('contacts.merge.withAnother')}>
+                        <IconButton size="small" onClick={() => onMergeContact()} aria-label={t('contacts.merge.withAnother')}>
+                          <CallMergeIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
                     {contact.archived ? (
                       onUnarchiveContact && (
                         <Button
@@ -302,7 +324,12 @@ export default function ContactHeader({
                   </Box>
                 </Box>
                 {contact.gender && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      color: "text.secondary",
+                      mt: 0.25
+                    }}>
                     {t(`contactDetail.${contact.gender}`)}
                   </Typography>
                 )}
@@ -319,7 +346,9 @@ export default function ContactHeader({
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" sx={{
+                  color: "text.secondary"
+                }}>
                   {t('contactDetail.circles')}
                 </Typography>
                 <IconButton
@@ -339,7 +368,14 @@ export default function ContactHeader({
               {editingCircles ? (
                 // Edit Mode
                 <Box>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1, mb: 1 }}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{
+                      flexWrap: "wrap",
+                      gap: 1,
+                      mb: 1
+                    }}>
                     {contact.circles && contact.circles.length > 0 ? (
                       contact.circles.map((circle, index) => (
                         <Chip
@@ -351,7 +387,9 @@ export default function ContactHeader({
                         />
                       ))
                     ) : (
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" sx={{
+                        color: "text.secondary"
+                      }}>
                         {t('contactDetail.noCircles')}
                       </Typography>
                     )}
@@ -401,13 +439,21 @@ export default function ContactHeader({
                 </Box>
               ) : (
                 // View Mode
-                <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 1 }}>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  sx={{
+                    flexWrap: "wrap",
+                    gap: 1
+                  }}>
                   {contact.circles && contact.circles.length > 0 ? (
                     contact.circles.map((circle, index) => (
                       <Chip key={index} label={circle} size="small" color="primary" />
                     ))
                   ) : (
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="caption" sx={{
+                      color: "text.secondary"
+                    }}>
                       {t('contactDetail.noCircles')}
                     </Typography>
                   )}

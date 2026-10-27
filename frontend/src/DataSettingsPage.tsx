@@ -18,6 +18,7 @@ import CustomFieldsSettings from './components/CustomFieldsSettings';
 import ContactFieldSettings from './components/ContactFieldSettings';
 import CalendarSyncSettings from './components/CalendarSyncSettings';
 import ContactSyncSettings from './components/ContactSyncSettings';
+import CardDAVCircleFilterSettings from './components/CardDAVCircleFilterSettings';
 import MonicaImportDialog from './components/MonicaImportDialog';
 
 export default function DataSettingsPage() {
@@ -76,6 +77,8 @@ export default function DataSettingsPage() {
 
       <ContactSyncSettings />
 
+      <CardDAVCircleFilterSettings />
+
       <Card sx={{ mb: 2 }}>
         <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
@@ -87,7 +90,9 @@ export default function DataSettingsPage() {
           <Divider sx={{ mb: 1.5 }} />
 
           <Stack spacing={1.5}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{
+              color: "text.secondary"
+            }}>
               {t('settings.monicaImport.description')}
             </Typography>
             <Button
@@ -119,7 +124,9 @@ export default function DataSettingsPage() {
           <Divider sx={{ mb: 1.5 }} />
 
           <Stack spacing={1.5}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{
+              color: "text.secondary"
+            }}>
               {t('settings.export.description')}
             </Typography>
             {exportError && <Alert severity="error" sx={{ py: 0 }}>{exportError}</Alert>}
@@ -148,7 +155,9 @@ export default function DataSettingsPage() {
           <Divider sx={{ mb: 1.5 }} />
 
           <Stack spacing={1.5}>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{
+              color: "text.secondary"
+            }}>
               {t('settings.exportVcf.description')}
             </Typography>
             {exportVcfError && <Alert severity="error" sx={{ py: 0 }}>{exportVcfError}</Alert>}

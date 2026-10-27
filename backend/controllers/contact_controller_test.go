@@ -3,9 +3,11 @@ package controllers
 import (
 	"bytes"
 	"encoding/json"
+	"meerkat/middleware"
 	"meerkat/models"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -13,6 +15,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetContacts(t *testing.T) {
@@ -126,6 +129,68 @@ func TestGetContactsSearchMultiValue(t *testing.T) {
 	assert.Equal(t, 1, search("5551112"), "phone array value should be searchable")
 	assert.Equal(t, 1, search("Hopper"), "name should still be searchable")
 	assert.Equal(t, 0, search("nomatch"), "unrelated term should match nothing")
+}
+
+// TestGetContactsSearchLiteralWildcards verifies that LIKE wildcards in a search term
+// match literally in every searched column: names, the combined name, and the
+// emails/phones JSON arrays, and relationship names.
+func TestGetContactsSearchLiteralWildcards(t *testing.T) {
+	db, router := setupRouter()
+
+	var user models.User
+	db.First(&user)
+
+	router.GET("/contacts", GetContacts)
+
+	db.Create(&models.Contact{UserID: user.ID, Firstname: "Fifty%", Lastname: "Percent"})
+	db.Create(&models.Contact{UserID: user.ID, Firstname: "Fifty5", Lastname: "Percent"})
+	db.Create(&models.Contact{
+		UserID:    user.ID,
+		Firstname: "Under",
+		Emails:    []models.ContactEmail{{Type: "home", Value: "a_b@example.com"}},
+	})
+	db.Create(&models.Contact{
+		UserID:    user.ID,
+		Firstname: "Other",
+		Emails:    []models.ContactEmail{{Type: "home", Value: "axb@example.com"}},
+	})
+	db.Create(&models.Contact{UserID: user.ID, Firstname: `Back\slash`})
+	db.Create(&models.Contact{
+		UserID:    user.ID,
+		Firstname: "Ext",
+		Phones: []models.ContactPhone{
+			{Type: "cell", Value: "+15550000"},
+			{Type: "work", Value: "555_0100"},
+		},
+	})
+	db.Create(&models.Contact{
+		UserID:    user.ID,
+		Firstname: "Noext",
+		Phones:    []models.ContactPhone{{Type: "work", Value: "55500100"}},
+	})
+	for _, rel := range []struct{ parent, child string }{{"ParentA", "Kid_one"}, {"ParentB", "KidXone"}} {
+		parent := models.Contact{UserID: user.ID, Firstname: rel.parent}
+		db.Create(&parent)
+		db.Create(&models.Relationship{UserID: user.ID, ContactID: parent.ID, Name: rel.child, Type: "Child"})
+	}
+
+	search := func(term string) int {
+		req, _ := http.NewRequest("GET", "/contacts?search="+url.QueryEscape(term), nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var body map[string]any
+		json.Unmarshal(w.Body.Bytes(), &body)
+		return int(body["total"].(float64))
+	}
+
+	assert.Equal(t, 1, search("Fifty%"), "% should match only a literal percent sign")
+	assert.Equal(t, 1, search("a_b"), "_ should match only a literal underscore")
+	assert.Equal(t, 1, search("Fifty% Percent"), "combined name should match % literally")
+	assert.Equal(t, 1, search("555_01"), "secondary phone should match _ literally")
+	assert.Equal(t, 1, search("Kid_one"), "relationship name should match _ literally")
+	assert.Equal(t, 0, search("%_"), "wildcard-only term should match nothing literal")
+	assert.Equal(t, 1, search(`k\s`), "backslash should match literally")
 }
 
 func TestGetContact(t *testing.T) {
@@ -353,6 +418,42 @@ func TestGetContactsWithSearchCriteria(t *testing.T) {
 
 	returnedContacts = responseBody["contacts"].([]any)
 	assert.Len(t, returnedContacts, 0)
+}
+
+func TestGetContactsSearchFindsRelationshipName(t *testing.T) {
+	db, router := setupRouter()
+
+	var user models.User
+	db.First(&user)
+
+	router.GET("/contacts", GetContacts)
+
+	parent := models.Contact{UserID: user.ID, Firstname: "Dana", Lastname: "Parent"}
+	db.Create(&parent)
+	linked := models.Contact{UserID: user.ID, Firstname: "Linkedkid", Lastname: "Parent"}
+	db.Create(&linked)
+	db.Create(&models.Relationship{UserID: user.ID, ContactID: parent.ID, Name: "Emma Parent", Type: "Child"})
+	db.Create(&models.Relationship{UserID: user.ID, ContactID: parent.ID, Name: "Linkedkid Parent", Type: "Child", RelatedContactID: &linked.ID})
+
+	search := func(term string) []any {
+		req, _ := http.NewRequest("GET", "/contacts?search="+term, nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var body map[string]any
+		json.Unmarshal(w.Body.Bytes(), &body)
+		return body["contacts"].([]any)
+	}
+
+	// An unlinked child is found through the parent it belongs to.
+	found := search("Emma")
+	assert.Len(t, found, 1)
+	assert.Equal(t, "Dana", found[0].(map[string]any)["firstname"])
+
+	// A child with a contact of its own is found as that contact only.
+	found = search("Linkedkid")
+	assert.Len(t, found, 1)
+	assert.Equal(t, "Linkedkid", found[0].(map[string]any)["firstname"])
 }
 
 func TestCreateContact(t *testing.T) {
@@ -679,4 +780,73 @@ func TestDeleteContactWithNoPhotos(t *testing.T) {
 	var respBody map[string]string
 	json.Unmarshal(w.Body.Bytes(), &respBody)
 	assert.Equal(t, "Contact deleted", respBody["message"])
+}
+
+func TestCreateContact_DeceasedFields(t *testing.T) {
+	db, router := setupRouter()
+
+	router.POST("/contacts", withValidated(func() any { return &models.ContactInput{} }), CreateContact)
+
+	body := `{"firstname":"Jane","is_deceased":true,"deceased_date":"2020-01-15"}`
+	req, _ := http.NewRequest("POST", "/contacts", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+
+	var created models.Contact
+	require.NoError(t, db.Where("firstname = ?", "Jane").First(&created).Error)
+	assert.True(t, created.IsDeceased)
+	assert.Equal(t, "2020-01-15", created.DeceasedDate)
+}
+
+func TestUpdateContact_DeceasedFields(t *testing.T) {
+	db, router := setupRouter()
+
+	var user models.User
+	db.First(&user)
+
+	router.PUT("/contacts/:id", withValidated(func() any { return &models.ContactInput{} }), UpdateContact)
+
+	contact := models.Contact{UserID: user.ID, Firstname: "John", Lastname: "Doe"}
+	require.NoError(t, db.Create(&contact).Error)
+
+	body := `{"firstname":"John","lastname":"Doe","is_deceased":true,"deceased_date":"2019-06-01"}`
+	req, _ := http.NewRequest("PUT", "/contacts/"+strconv.Itoa(int(contact.ID)), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var updated models.Contact
+	require.NoError(t, db.First(&updated, contact.ID).Error)
+	assert.True(t, updated.IsDeceased)
+	assert.Equal(t, "2019-06-01", updated.DeceasedDate)
+}
+
+// TestUpdateContact_RejectsDeceasedDateBeforeBirthday exercises the real
+// production validation middleware (rather than the test-only withValidated
+// helper, which only runs gin's "binding" tags and skips the "validate" tags
+// that carry the deceased_date rule) so that the deceased_date-before-birthday
+// rejection is actually enforced.
+func TestUpdateContact_RejectsDeceasedDateBeforeBirthday(t *testing.T) {
+	db, router := setupRouter()
+
+	var user models.User
+	db.First(&user)
+
+	router.PUT("/contacts/:id", middleware.ValidateJSONMiddleware(&models.ContactInput{}), UpdateContact)
+
+	contact := models.Contact{UserID: user.ID, Firstname: "John", Lastname: "Doe", Birthday: "1990-05-01"}
+	require.NoError(t, db.Create(&contact).Error)
+
+	body := `{"firstname":"John","lastname":"Doe","birthday":"1990-05-01","is_deceased":true,"deceased_date":"1980-01-01"}`
+	req, _ := http.NewRequest("PUT", "/contacts/"+strconv.Itoa(int(contact.ID)), bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }

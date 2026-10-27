@@ -136,6 +136,9 @@ type ContactInput struct {
 	Role         string `json:"role" validate:"max=200"`
 
 	Anniversary string `json:"anniversary" validate:"omitempty,birthday"`
+
+	IsDeceased   bool   `json:"is_deceased"`
+	DeceasedDate string `json:"deceased_date" validate:"omitempty,deceased_date"`
 }
 
 // CustomFieldNamesInput represents the DTO for updating user's custom field definitions
@@ -148,13 +151,26 @@ type EnabledContactFieldsInput struct {
 	Fields []string `json:"fields" validate:"dive,max=50"`
 }
 
+// CardDAVCircleFilterInput represents the DTO for limiting the built-in CardDAV
+// server to, or hiding from it, a set of circles
+type CardDAVCircleFilterInput struct {
+	Mode    string   `json:"mode" validate:"required,oneof=all include exclude"`
+	Circles []string `json:"circles" validate:"max=200,dive,max=100"`
+}
+
+// represents the DTO for choosing whether empty contact fields are hidden on the contact detail page
+type ContactFieldDisplayInput struct {
+	// Pointer + required so a missing key is rejected instead of silently decoding to false
+	HideEmptyContactFields *bool `json:"hide_empty_contact_fields" validate:"required"`
+}
+
 // UserRegistrationInput represents the DTO for user registration
 // This DTO intentionally excludes IsAdmin to prevent mass assignment attacks
 type UserRegistrationInput struct {
 	Username string `json:"username" validate:"required,min=1,max=50,no_at_sign"`
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=8,strong_password"`
-	Language string `json:"language" validate:"omitempty,oneof=en de it es fr"`
+	Language string `json:"language" validate:"omitempty,oneof=en de it es fr zh"`
 }
 
 // PasswordResetRequestInput captures email for initiating password reset
@@ -182,6 +198,20 @@ type RelationshipInput struct {
 	Gender           string `json:"gender" validate:"omitempty,oneof=male female other prefer_not_to_say"`
 	Birthday         string `json:"birthday" validate:"omitempty,birthday"`
 	RelatedContactID *uint  `json:"related_contact_id"`
+}
+
+// ContactMergeInput is the DTO for merging a source contact into the contact in
+// the URL. Resolutions picks the winner ("target" or "source") per conflicting
+// field, keyed like MergeConflict.Field; an unresolved conflict keeps the target's value.
+type ContactMergeInput struct {
+	SourceID    uint              `json:"source_id" validate:"required,gt=0"`
+	Resolutions map[string]string `json:"resolutions" validate:"omitempty,dive,oneof=target source"`
+}
+
+// DuplicateDismissInput is the DTO for marking two contacts as not duplicates.
+type DuplicateDismissInput struct {
+	ContactAID uint `json:"contact_a_id" validate:"required,gt=0"`
+	ContactBID uint `json:"contact_b_id" validate:"required,gt=0,nefield=ContactAID"`
 }
 
 // ContactResponse represents the DTO returned from GET /contacts with photo thumbnail
@@ -237,11 +267,12 @@ type AdminUserResponse struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
-// /users/me payload: standard user fields plus caller's UI preferences (custom field names and enabled contact fields)
+// /users/me payload: standard user fields plus caller's UI preferences (custom field names, enabled contact fields, empty-field display)
 type CurrentUserResponse struct {
 	AdminUserResponse
-	CustomFieldNames     []string `json:"custom_field_names"`
-	EnabledContactFields []string `json:"enabled_contact_fields"`
+	CustomFieldNames       []string `json:"custom_field_names"`
+	EnabledContactFields   []string `json:"enabled_contact_fields"`
+	HideEmptyContactFields bool     `json:"hide_empty_contact_fields"`
 }
 
 // AdminUserUpdateInput - DTO for admin updating a user

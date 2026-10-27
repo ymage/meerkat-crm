@@ -14,6 +14,8 @@ interface EditableArrayFieldProps<T> {
   /** Deep-clones the value into an editable draft */
   cloneValue: (value: T) => T;
   onSave: (draft: T) => Promise<void>;
+  /** Called when the editor opens or closes, so a parent can keep the field mounted while editing */
+  onEditingChange?: (editing: boolean) => void;
 }
 
 export default function EditableArrayField<T>({
@@ -24,6 +26,7 @@ export default function EditableArrayField<T>({
   renderEditor,
   cloneValue,
   onSave,
+  onEditingChange,
 }: EditableArrayFieldProps<T>) {
   const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
@@ -33,10 +36,12 @@ export default function EditableArrayField<T>({
   const startEdit = () => {
     setDraft(cloneValue(value));
     setEditing(true);
+    onEditingChange?.(true);
   };
 
   const cancel = () => {
     setEditing(false);
+    onEditingChange?.(false);
   };
 
   const save = async () => {
@@ -44,6 +49,7 @@ export default function EditableArrayField<T>({
       setSaving(true);
       await onSave(draft);
       setEditing(false);
+      onEditingChange?.(false);
     } finally {
       setSaving(false);
     }
@@ -52,7 +58,9 @@ export default function EditableArrayField<T>({
   if (editing) {
     return (
       <Box>
-        <Stack direction="row" spacing={1} alignItems="flex-start">
+        <Stack direction="row" spacing={1} sx={{
+          alignItems: "flex-start"
+        }}>
           <Box sx={{ pt: 0.5 }}>{icon}</Box>
           <Box sx={{ flexGrow: 1 }}>
             {renderEditor(draft, setDraft)}
@@ -80,7 +88,9 @@ export default function EditableArrayField<T>({
     >
       {icon}
       <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" sx={{
+          color: "text.secondary"
+        }}>
           {label}
         </Typography>
         <Box sx={{ wordBreak: 'break-word' }}>{renderDisplay(value)}</Box>

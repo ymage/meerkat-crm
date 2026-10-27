@@ -3,6 +3,7 @@ package controllers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -397,6 +398,82 @@ func TestChangePassword_Succeeds(t *testing.T) {
 	assert.Nil(t, updated.PasswordResetRequestedAt)
 }
 
+func TestUpdateLanguage_Chinese(t *testing.T) {
+	db, router := setupRouter()
+
+	user := models.User{Username: "polyglot", Email: "polyglot@example.com", Password: "x"}
+	db.Create(&user)
+
+	router.PATCH("/users/language", func(c *gin.Context) {
+		c.Set("username", "polyglot")
+		UpdateLanguage(c)
+	})
+
+	body, _ := json.Marshal(map[string]string{"language": "zh"})
+	req, _ := http.NewRequest("PATCH", "/users/language", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var updated models.User
+	db.Where("username = ?", "polyglot").First(&updated)
+	assert.Equal(t, "zh", updated.Language)
+}
+
+func TestCardDAVCircleFilter(t *testing.T) {
+	_, router := setupRouter()
+	router.GET("/filter", GetCardDAVCircleFilter)
+	router.PATCH("/filter",
+		middleware.ValidateJSONMiddleware(&models.CardDAVCircleFilterInput{}),
+		UpdateCardDAVCircleFilter)
+
+	get := func() string {
+		req, _ := http.NewRequest("GET", "/filter", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+		return w.Body.String()
+	}
+	patch := func(jsonBody string) int {
+		req, _ := http.NewRequest("PATCH", "/filter", bytes.NewBufferString(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w.Code
+	}
+
+	// Never configured -> everything syncs.
+	assert.JSONEq(t, `{"mode":"all","circles":[]}`, get())
+
+	// Circles are trimmed and deduplicated case-insensitively.
+	assert.Equal(t, http.StatusOK, patch(`{"mode":"include","circles":["Family"," family ","Friends",""]}`))
+	assert.JSONEq(t, `{"mode":"include","circles":["Family","Friends"]}`, get())
+
+	// Saving the same filter again still succeeds.
+	assert.Equal(t, http.StatusOK, patch(`{"mode":"include","circles":["Family","Friends"]}`))
+
+	// A filter mode without circles and an unknown mode are rejected, leaving the setting alone.
+	assert.Equal(t, http.StatusBadRequest, patch(`{"mode":"exclude","circles":[]}`))
+	assert.Equal(t, http.StatusBadRequest, patch(`{"mode":"only","circles":["Family"]}`))
+	// The circle list is capped at 200 entries; distinct names so only the cap can reject it.
+	manyCircles := make([]string, 201)
+	for i := range manyCircles {
+		manyCircles[i] = fmt.Sprintf("Circle %d", i)
+	}
+	tooMany, _ := json.Marshal(models.CardDAVCircleFilterInput{Mode: "include", Circles: manyCircles})
+	assert.Equal(t, http.StatusBadRequest, patch(string(tooMany)))
+	justEnough, _ := json.Marshal(models.CardDAVCircleFilterInput{Mode: "include", Circles: manyCircles[:200]})
+	assert.Equal(t, http.StatusOK, patch(string(justEnough)))
+	assert.Equal(t, http.StatusOK, patch(`{"mode":"include","circles":["Family","Friends"]}`))
+	assert.JSONEq(t, `{"mode":"include","circles":["Family","Friends"]}`, get())
+
+	// "all" ignores circles, so any sent along are dropped.
+	assert.Equal(t, http.StatusOK, patch(`{"mode":"all","circles":["Family"]}`))
+	assert.JSONEq(t, `{"mode":"all","circles":[]}`, get())
+}
+
 // TestEnabledContactFieldsNullVsEmpty verifies the GET/PATCH endpoints preserve the
 // distinction between "never configured" (null -> client applies defaults) and
 // "configured empty" ([] -> no extended fields), and that the scoped column write
@@ -439,4 +516,50 @@ func TestEnabledContactFieldsNullVsEmpty(t *testing.T) {
 	// Explicitly empty stays distinct from null.
 	patch(`{"fields":[]}`)
 	assert.Equal(t, "[]", rawField())
+}
+
+// TestContactFieldDisplayRoundTrip verifies the hide-empty preference defaults to
+// false, is exposed on /users/me, can be turned on and back off (false is GORM's
+// zero value), and that a body without the key is rejected.
+func TestContactFieldDisplayRoundTrip(t *testing.T) {
+	_, router := setupRouter()
+
+	router.PATCH("/display",
+		middleware.ValidateJSONMiddleware(&models.ContactFieldDisplayInput{}),
+		UpdateContactFieldDisplay)
+
+	router.GET("/me", GetCurrentUser)
+
+	patch := func(jsonBody string) int {
+		req, _ := http.NewRequest("PATCH", "/display", bytes.NewBufferString(jsonBody))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w.Code
+	}
+	// Read back through /users/me, which is how the frontend gets the setting.
+	fromMe := func() bool {
+		req, _ := http.NewRequest("GET", "/me", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var body map[string]any
+		json.Unmarshal(w.Body.Bytes(), &body)
+		v, ok := body["hide_empty_contact_fields"].(bool)
+		assert.True(t, ok, "hide_empty_contact_fields missing from /users/me")
+		return v
+	}
+
+	assert.False(t, fromMe())
+
+	assert.Equal(t, http.StatusOK, patch(`{"hide_empty_contact_fields":true}`))
+	assert.True(t, fromMe())
+
+	// A missing or misspelled key is rejected rather than silently turning it off.
+	assert.Equal(t, http.StatusBadRequest, patch(`{}`))
+	assert.Equal(t, http.StatusBadRequest, patch(`{"hide_empty":false}`))
+	assert.True(t, fromMe())
+
+	assert.Equal(t, http.StatusOK, patch(`{"hide_empty_contact_fields":false}`))
+	assert.False(t, fromMe())
 }

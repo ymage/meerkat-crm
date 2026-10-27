@@ -224,6 +224,7 @@
     "jobTitle": "Posizione",
     "role": "Ruolo",
     "anniversary": "Anniversario",
+    "deceased": "Deceduto/a",
     "fieldType": "Tipo",
     "types": {
       "home": "Casa",
@@ -238,6 +239,47 @@
       "region": "Regione",
       "postal": "CAP",
       "country": "Paese"
+    },
+    "duplicates": {
+      "button": "Trova duplicati",
+      "title": "Possibili duplicati",
+      "description": "Contatti che condividono nome, indirizzo email o numero di telefono. Uniscili oppure segnalali come persone diverse.",
+      "none": "Nessun contatto duplicato trovato.",
+      "dismiss": "Non è un duplicato",
+      "reason": {
+        "name": "Stesso nome",
+        "email": "Stessa email",
+        "phone": "Stesso telefono"
+      }
+    },
+    "merge": {
+      "button": "Unisci",
+      "title": "Unisci contatti",
+      "withAnother": "Unisci con un altro contatto",
+      "pickDescription": "Scegli il contatto da unire a questo.",
+      "pickLabel": "Contatto da unire",
+      "keep": "Mantieni",
+      "remove": "Unisci ed elimina",
+      "swap": "Scambia il contatto da mantenere",
+      "conflictsTitle": "I due contatti hanno valori diversi qui. Scegli quale mantenere:",
+      "noConflicts": "Nessun campo in conflitto: tutti i dati possono essere combinati.",
+      "combinedInfo": "Indirizzi email, numeri di telefono, indirizzi, siti web, cerchie e campi personalizzati di entrambi i contatti vengono combinati.",
+      "movedInfo": "Sposta anche {{items}}.",
+      "notesCount_one": "{{count}} nota",
+      "notesCount_other": "{{count}} note",
+      "activitiesCount_one": "{{count}} attività",
+      "activitiesCount_other": "{{count}} attività",
+      "remindersCount_one": "{{count}} promemoria",
+      "remindersCount_other": "{{count}} promemoria",
+      "relationshipsCount_one": "{{count}} relazione",
+      "relationshipsCount_other": "{{count}} relazioni",
+      "deleteWarning": "{{name}} verrà eliminato dopo l’unione. L’operazione non può essere annullata.",
+      "confirm": "Unisci contatti",
+      "success": "Contatti uniti",
+      "photo": "Foto del profilo",
+      "notDeceased": "Non deceduto",
+      "active": "Attivo",
+      "archivedRemovesReminders": "Archiviato (i suoi promemoria vengono eliminati)"
     }
   },
   "timeline": {
@@ -252,6 +294,11 @@
     "phone": "Telefono",
     "birthday": "Compleanno",
     "birthdayError": "Formato data non valido. Controlla le impostazioni del formato data.",
+    "birthdayReminder": "Promemoria compleanno",
+    "deceased": "Deceduto/a",
+    "deceasedDate": "Data di decesso",
+    "deceasedDateError": "Data non valida. Deve essere una data reale e passata, uguale o successiva al compleanno.",
+    "deceasedYes": "Sì",
     "address": "Indirizzo",
     "workInfo": "Informazioni Lavorative",
     "foodPreferences": "Preferenze Alimentari",
@@ -291,7 +338,12 @@
     "archive": "Archivia",
     "unarchive": "Ripristina",
     "archivedBadge": "Archiviato",
-    "archiveConfirmation": "Sei sicuro di voler archiviare questo contatto? Tutti i promemoria verranno eliminati. Potrai ripristinarlo in seguito, ma i promemoria non verranno recuperati."
+    "archiveConfirmation": "Sei sicuro di voler archiviare questo contatto? Tutti i promemoria verranno eliminati. Potrai ripristinarlo in seguito, ma i promemoria non verranno recuperati.",
+    "exportVcard": "Esporta vCard",
+    "exportVcardError": "Impossibile esportare il contatto come vCard. Riprova.",
+    "showAllFields": "Mostra tutti i campi",
+    "hideEmptyFields": "Nascondi campi vuoti",
+    "noFilledFields": "Nessun dato ancora compilato."
   },
   "noteDialog": {
     "title": "Aggiungi Nota",
@@ -301,7 +353,8 @@
     "cancel": "Annulla",
     "save": "Salva",
     "required": "Il contenuto è obbligatorio",
-    "saveError": "Impossibile salvare la nota"
+    "saveError": "Impossibile salvare la nota",
+    "dateError": "Formato data non valido. Controlla le impostazioni del formato data."
   },
   "activityDialog": {
     "title": "Aggiungi Attività",
@@ -316,7 +369,8 @@
     "selectContacts": "Seleziona contatti...",
     "cancel": "Annulla",
     "save": "Salva",
-    "required": "Titolo e data sono obbligatori"
+    "required": "Titolo e data sono obbligatori",
+    "dateError": "Formato data non valido. Controlla le impostazioni del formato data."
   },
   "activities": {
     "title": "Attività",
@@ -376,7 +430,8 @@
       "quarterly": "Trimestrale",
       "six-months": "Ogni 6 mesi",
       "yearly": "Annuale"
-    }
+    },
+    "dateInvalid": "Formato data non valido. Controlla le impostazioni del formato data."
   },
   "common": {
     "save": "Salva",
@@ -525,7 +580,46 @@
         "relationships": "{{count}} relazioni importate",
         "relationshipsCollapsed": "{{count}} duplicati reciproci saltati (mostrati come relazioni in entrata)",
         "photos": "{{count}} foto importate",
-        "photosFailed": "{{count}} foto non sono state scaricate"
+        "photosFailed": "{{count}} foto non sono state scaricate",
+        "issues": {
+          "title": "Elementi saltati o non riusciti ({{count}})",
+          "hint": "Ogni record di Monica non importato, o importato senza parte dei suoi dati, raggruppato per motivo.",
+          "columns": {
+            "type": "Tipo",
+            "contact": "Contatto",
+            "item": "Elemento",
+            "details": "Dettagli"
+          },
+          "failed": "non riuscito",
+          "entities": {
+            "contact": "Contatto",
+            "relationship": "Relazione",
+            "activity": "Attività",
+            "note": "Nota",
+            "reminder": "Promemoria",
+            "call": "Chiamata",
+            "task": "Attività da fare",
+            "gift": "Regalo",
+            "debt": "Debito",
+            "birthday": "Compleanno",
+            "photo": "Foto"
+          },
+          "reasons": {
+            "not_selected": "Impostato su «salta» nella revisione",
+            "invalid": "Dati del contatto non validi",
+            "no_match": "Impostato su «aggiorna», ma nessun contatto corrispondente trovato",
+            "contact_not_imported": "Appartiene a un contatto non importato",
+            "already_exists": "Già presente in Meerkat (ad es. da un’importazione precedente)",
+            "incomplete": "Mancano dati necessari a Meerkat (nome, data o contenuto)",
+            "expired": "Promemoria singolo con data passata",
+            "unsupported_frequency": "Intervallo di ripetizione non supportato da Meerkat",
+            "approximate_birthday": "Monica conosce solo un’età approssimativa, non una data di nascita",
+            "error": "Impossibile salvare",
+            "birthday_on_relationship": "Compleanno salvato sulla relazione, che Meerkat annuncia già",
+            "photo_failed": "Impossibile scaricare la foto"
+          },
+          "rolledUp": "{{count}} elementi"
+        }
       },
       "errors": {
         "fetchFailed": "Recupero dei dati da Monica non riuscito"
@@ -604,6 +698,25 @@
       "disconnect": "Scollega",
       "disconnectTitle": "Scollegare il server CardDAV?",
       "disconnectConfirm": "I tuoi contatti restano in Meerkat; vengono rimossi solo la connessione e il suo stato di sincronizzazione."
+    },
+    "carddavCircleFilter": {
+      "title": "Filtro di sincronizzazione del telefono (server CardDAV integrato)",
+      "description": "Scegli quali contatti il server CardDAV integrato di Meerkat mostra al tuo telefono e agli altri dispositivi. I contatti esclusi dal filtro restano in Meerkat e sono sempre ricercabili qui.",
+      "loading": "Caricamento…",
+      "loadError": "Impossibile caricare il filtro di sincronizzazione del telefono.",
+      "saveError": "Impossibile salvare il filtro di sincronizzazione del telefono.",
+      "saveSuccess": "Filtro salvato. I tuoi dispositivi lo applicheranno alla prossima sincronizzazione.",
+      "modeAll": "Sincronizza tutti i contatti",
+      "modeInclude": "Sincronizza solo i contatti di queste cerchie",
+      "modeExclude": "Sincronizza tutti i contatti tranne quelli di queste cerchie",
+      "circlesLabel": "Cerchie",
+      "circlesRequired": "Seleziona almeno una cerchia.",
+      "noCircles": "Ancora nessuna cerchia",
+      "unusedCircles": "Nessun contatto appartiene più a queste cerchie: {{circles}}",
+      "allCirclesUnused": "Nessun contatto appartiene più a nessuna di queste cerchie, quindi i tuoi dispositivi non mostrerebbero alcun contatto.",
+      "includeNewContactsHint": "I contatti creati su un dispositivo vengono salvati in Meerkat, ma scompaiono dal dispositivo alla sincronizzazione successiva a meno che tu non li aggiunga a una di queste cerchie.",
+      "removalHint": "I contatti che escono dal filtro vengono rimossi solo dai tuoi dispositivi. Eliminare un contatto sincronizzato su un dispositivo lo elimina comunque anche in Meerkat.",
+      "save": "Salva filtro"
     },
     "about": {
       "title": "Informazioni su Meerkat CRM",
@@ -691,6 +804,8 @@
       "loading": "Caricamento…",
       "loadError": "Impossibile caricare le impostazioni dei campi contatto.",
       "saveError": "Impossibile salvare le impostazioni dei campi contatto.",
+      "hideEmpty": "Mostra solo i campi compilati",
+      "hideEmptyDescription": "In un contatto, i campi vuoti sono nascosti finché non fai clic su «Mostra tutti i campi».",
       "groups": {
         "communication": "Comunicazione",
         "name": "Nome",

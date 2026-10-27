@@ -45,16 +45,33 @@ export async function updateCustomFieldNames(names: string[]): Promise<string[]>
   return data?.custom_field_names || names;
 }
 
-// Returns the user's enabled extended contact fields, or null if never configured
-// (in which case the caller should apply DEFAULT_ENABLED_CONTACT_FIELDS).
-export async function getEnabledContactFields(): Promise<string[] | null> {
-  const response = await apiFetch(`${API_BASE_URL}/users/enabled-contact-fields`, {
+export type CardDAVCircleMode = 'all' | 'include' | 'exclude';
+
+export interface CardDAVCircleFilter {
+  mode: CardDAVCircleMode;
+  circles: string[];
+}
+
+// Which circles Meerkat's built-in CardDAV server shows the user's devices.
+export async function getCardDAVCircleFilter(): Promise<CardDAVCircleFilter> {
+  const response = await apiFetch(`${API_BASE_URL}/users/carddav-circle-filter`, {
     method: 'GET',
     headers: getAuthHeaders(),
   });
 
-  const data = await handleResponse(response, 'Unable to get enabled contact fields.');
-  return data?.enabled_contact_fields ?? null;
+  const data = await handleResponse(response, 'Unable to get the CardDAV circle filter.');
+  return { mode: data?.mode ?? 'all', circles: data?.circles ?? [] };
+}
+
+export async function updateCardDAVCircleFilter(filter: CardDAVCircleFilter): Promise<CardDAVCircleFilter> {
+  const response = await apiFetch(`${API_BASE_URL}/users/carddav-circle-filter`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(filter),
+  });
+
+  const data = await handleResponse(response, 'Unable to update the CardDAV circle filter.');
+  return { mode: data?.mode ?? filter.mode, circles: data?.circles ?? filter.circles };
 }
 
 export async function updateEnabledContactFields(fields: string[]): Promise<string[]> {
@@ -66,4 +83,15 @@ export async function updateEnabledContactFields(fields: string[]): Promise<stri
 
   const data = await handleResponse(response, 'Unable to update enabled contact fields.');
   return data?.enabled_contact_fields || fields;
+}
+
+export async function updateContactFieldDisplay(hideEmpty: boolean): Promise<boolean> {
+  const response = await apiFetch(`${API_BASE_URL}/users/contact-field-display`, {
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ hide_empty_contact_fields: hideEmpty }),
+  });
+
+  const data = await handleResponse(response, 'Unable to update contact field display.');
+  return data?.hide_empty_contact_fields ?? hideEmpty;
 }

@@ -6,11 +6,8 @@ import deTranslations from './locales/de.json';
 import itTranslations from './locales/it.json';
 import esTranslations from './locales/es.json';
 import frTranslations from './locales/fr.json';
+import zhTranslations from './locales/zh.json';
 
-// Suppress i18next's promotional console message (hardcoded since v23)
-const noop = () => {};
-const origLog = console.log;
-console.log = noop;
 i18n
   .use(LanguageDetector)
   .use(initReactI18next)
@@ -30,6 +27,9 @@ i18n
       },
       fr: {
         translation: frTranslations
+      },
+      zh: {
+        translation: zhTranslations
       }
     },
     fallbackLng: 'en',
@@ -42,8 +42,6 @@ i18n
       order: ['localStorage', 'navigator'],
       caches: ['localStorage']
     }
-  }).then(() => {
-    console.log = origLog;
   });
 
 export default i18n;

@@ -25,6 +25,7 @@ import {
 } from '@mui/material';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import FileUploadIcon from '@mui/icons-material/FileUpload';
+import CallMergeIcon from '@mui/icons-material/CallMerge';
 import { ContactListSkeleton } from './components/LoadingSkeletons';
 
 export default function ContactsPage() {
@@ -132,7 +133,13 @@ export default function ContactsPage() {
       <Typography variant="h5" gutterBottom sx={{ mb: 2 }}>
         {t('contacts.title')}
       </Typography>
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} mb={2} alignItems="center">
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={1.5}
+        sx={{
+          mb: 2,
+          alignItems: "center"
+        }}>
         <FormControl sx={{ minWidth: 180 }} size="small">
           <InputLabel id="circle-select-label">{t('contacts.filterByCircle')}</InputLabel>
           <Select
@@ -173,6 +180,14 @@ export default function ContactsPage() {
           label={t('contacts.showArchived')}
           sx={{ ml: 0.5, whiteSpace: 'nowrap' }}
         />
+        <Button
+          variant="outlined"
+          startIcon={<CallMergeIcon />}
+          onClick={() => navigate('/contacts/duplicates')}
+          sx={{ whiteSpace: 'nowrap' }}
+        >
+          {t('contacts.duplicates.button')}
+        </Button>
         <Button
           variant="outlined"
           startIcon={<FileUploadIcon />}
@@ -258,7 +273,14 @@ export default function ContactsPage() {
                       />
                     )}
                   </Box>
-                  <Stack direction="row" spacing={0.5} mt={0.5} flexWrap="wrap" gap={0.5}>
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    sx={{
+                      mt: 0.5,
+                      flexWrap: "wrap",
+                      gap: 0.5
+                    }}>
                     {contact.circles && contact.circles.filter((circle, idx, arr) => arr.indexOf(circle) === idx).map((circle: string) => (
                       <Chip
                         key={`${contact.ID}-${circle}`}

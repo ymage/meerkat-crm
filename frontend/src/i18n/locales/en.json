@@ -224,6 +224,7 @@
     "jobTitle": "Job Title",
     "role": "Role",
     "anniversary": "Anniversary",
+    "deceased": "Deceased",
     "fieldType": "Type",
     "types": {
       "home": "Home",
@@ -238,6 +239,47 @@
       "region": "State / Region",
       "postal": "Postal Code",
       "country": "Country"
+    },
+    "duplicates": {
+      "button": "Find duplicates",
+      "title": "Possible duplicates",
+      "description": "Contacts that share a name, an email address or a phone number. Merge them, or mark them as different people.",
+      "none": "No duplicate contacts found.",
+      "dismiss": "Not a duplicate",
+      "reason": {
+        "name": "Same name",
+        "email": "Same email",
+        "phone": "Same phone"
+      }
+    },
+    "merge": {
+      "button": "Merge",
+      "title": "Merge contacts",
+      "withAnother": "Merge with another contact",
+      "pickDescription": "Choose the contact to merge into this one.",
+      "pickLabel": "Contact to merge",
+      "keep": "Keep",
+      "remove": "Merge and delete",
+      "swap": "Swap which contact is kept",
+      "conflictsTitle": "Both contacts have different values here. Choose which to keep:",
+      "noConflicts": "No conflicting fields: all details can be combined.",
+      "combinedInfo": "Email addresses, phone numbers, addresses, websites, circles and custom fields from both contacts are combined.",
+      "movedInfo": "Also moves {{items}}.",
+      "notesCount_one": "{{count}} note",
+      "notesCount_other": "{{count}} notes",
+      "activitiesCount_one": "{{count}} activity",
+      "activitiesCount_other": "{{count}} activities",
+      "remindersCount_one": "{{count}} reminder",
+      "remindersCount_other": "{{count}} reminders",
+      "relationshipsCount_one": "{{count}} relationship",
+      "relationshipsCount_other": "{{count}} relationships",
+      "deleteWarning": "{{name}} will be deleted after the merge. This cannot be undone.",
+      "confirm": "Merge contacts",
+      "success": "Contacts merged",
+      "photo": "Profile photo",
+      "notDeceased": "Not deceased",
+      "active": "Active",
+      "archivedRemovesReminders": "Archived (its reminders are deleted)"
     }
   },
   "timeline": {
@@ -252,6 +294,11 @@
     "phone": "Phone",
     "birthday": "Birthday",
     "birthdayError": "Invalid date format. Check your date format setting.",
+    "birthdayReminder": "Birthday reminder",
+    "deceased": "Deceased",
+    "deceasedDate": "Date of death",
+    "deceasedDateError": "Invalid date. Must be a real, past date on or after the birthday.",
+    "deceasedYes": "Yes",
     "address": "Address",
     "workInfo": "Work Information",
     "foodPreferences": "Food Preferences",
@@ -291,7 +338,12 @@
     "archive": "Archive",
     "unarchive": "Unarchive",
     "archivedBadge": "Archived",
-    "archiveConfirmation": "Are you sure you want to archive this contact? All reminders will be deleted. You can unarchive later, but reminders won't be restored."
+    "archiveConfirmation": "Are you sure you want to archive this contact? All reminders will be deleted. You can unarchive later, but reminders won't be restored.",
+    "exportVcard": "Export vCard",
+    "exportVcardError": "Failed to export contact as vCard. Please try again.",
+    "showAllFields": "Show all fields",
+    "hideEmptyFields": "Hide empty fields",
+    "noFilledFields": "No details filled in yet."
   },
   "noteDialog": {
     "title": "Add Note",
@@ -301,7 +353,8 @@
     "cancel": "Cancel",
     "save": "Save",
     "required": "Content is required",
-    "saveError": "Failed to save note"
+    "saveError": "Failed to save note",
+    "dateError": "Invalid date format. Check your date format setting."
   },
   "activityDialog": {
     "title": "Add Activity",
@@ -316,7 +369,8 @@
     "selectContacts": "Select contacts...",
     "cancel": "Cancel",
     "save": "Save",
-    "required": "Title and date are required"
+    "required": "Title and date are required",
+    "dateError": "Invalid date format. Check your date format setting."
   },
   "activities": {
     "title": "Activities",
@@ -376,7 +430,8 @@
       "quarterly": "Quarterly",
       "six-months": "Every 6 months",
       "yearly": "Yearly"
-    }
+    },
+    "dateInvalid": "Invalid date format. Check your date format setting."
   },
   "common": {
     "save": "Save",
@@ -525,7 +580,46 @@
         "relationships": "{{count}} relationships imported",
         "relationshipsCollapsed": "{{count}} reciprocal duplicates skipped (shown as incoming relationships)",
         "photos": "{{count}} photos imported",
-        "photosFailed": "{{count}} photos could not be downloaded"
+        "photosFailed": "{{count}} photos could not be downloaded",
+        "issues": {
+          "title": "Skipped and failed items ({{count}})",
+          "hint": "Every Monica record that was not imported, or was imported without part of its data, grouped by reason.",
+          "columns": {
+            "type": "Type",
+            "contact": "Contact",
+            "item": "Item",
+            "details": "Details"
+          },
+          "failed": "failed",
+          "entities": {
+            "contact": "Contact",
+            "relationship": "Relationship",
+            "activity": "Activity",
+            "note": "Note",
+            "reminder": "Reminder",
+            "call": "Call",
+            "task": "Task",
+            "gift": "Gift",
+            "debt": "Debt",
+            "birthday": "Birthday",
+            "photo": "Photo"
+          },
+          "reasons": {
+            "not_selected": "Set to \"skip\" in the review step",
+            "invalid": "Invalid contact data",
+            "no_match": "Set to \"update\", but no matching contact was found",
+            "contact_not_imported": "Belongs to a contact that was not imported",
+            "already_exists": "Already in Meerkat (e.g. from an earlier import)",
+            "incomplete": "Missing data Meerkat needs (name, date or content)",
+            "expired": "One-time reminder whose date has passed",
+            "unsupported_frequency": "Repeat interval Meerkat does not support",
+            "approximate_birthday": "Monica only knows an approximate age, not a birth date",
+            "error": "Could not be saved",
+            "birthday_on_relationship": "Birthday kept on the relationship, which Meerkat announces already",
+            "photo_failed": "Photo could not be downloaded"
+          },
+          "rolledUp": "{{count}} items"
+        }
       },
       "errors": {
         "fetchFailed": "Fetching data from Monica failed"
@@ -604,6 +698,25 @@
       "disconnect": "Disconnect",
       "disconnectTitle": "Disconnect CardDAV server?",
       "disconnectConfirm": "Your contacts stay in Meerkat; only the connection and its sync state are removed."
+    },
+    "carddavCircleFilter": {
+      "title": "Phone sync filter (built-in CardDAV server)",
+      "description": "Choose which contacts Meerkat's built-in CardDAV server shows your phone and other devices. Contacts outside the filter stay in Meerkat and remain searchable here.",
+      "loading": "Loading…",
+      "loadError": "Failed to load the phone sync filter.",
+      "saveError": "Failed to save the phone sync filter.",
+      "saveSuccess": "Filter saved. Your devices pick it up on their next sync.",
+      "modeAll": "Sync all contacts",
+      "modeInclude": "Only sync contacts in these circles",
+      "modeExclude": "Sync all contacts except those in these circles",
+      "circlesLabel": "Circles",
+      "circlesRequired": "Select at least one circle.",
+      "noCircles": "No circles yet",
+      "unusedCircles": "No contact is in these circles any more: {{circles}}",
+      "allCirclesUnused": "No contact is in any of these circles any more, so your devices would show no contacts at all.",
+      "includeNewContactsHint": "Contacts you create on a device are saved to Meerkat but disappear from the device on its next sync unless you add them to one of these circles.",
+      "removalHint": "Contacts that leave the filter are removed from your devices only. Deleting a synced contact on a device still deletes it in Meerkat.",
+      "save": "Save filter"
     },
     "about": {
       "title": "About Meerkat CRM",
@@ -691,6 +804,8 @@
       "loading": "Loading…",
       "loadError": "Unable to load contact field settings.",
       "saveError": "Unable to save contact field settings.",
+      "hideEmpty": "Only show filled-in fields",
+      "hideEmptyDescription": "On a contact, empty fields are hidden until you click \"Show all fields\".",
       "groups": {
         "communication": "Communication",
         "name": "Name",

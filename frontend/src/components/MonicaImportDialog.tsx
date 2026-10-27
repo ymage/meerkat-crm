@@ -30,12 +30,16 @@ import {
   Tooltip,
   Link,
   Stack,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import AppDialog from './AppDialog';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import WarningIcon from '@mui/icons-material/Warning';
 import ErrorIcon from '@mui/icons-material/Error';
 import CloseIcon from '@mui/icons-material/Close';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { useSnackbar } from '../context/SnackbarContext';
 import { getErrorMessage } from '../utils/errorHandler';
 import {
@@ -49,6 +53,7 @@ import {
   MonicaImportStatus,
   MonicaPreviewResponse,
   MonicaImportResult,
+  MonicaImportIssue,
 } from '../api/monicaImport';
 import { RowImportAction } from '../api/import';
 
@@ -333,7 +338,12 @@ export default function MonicaImportDialog({
 
   const renderConnectStep = () => (
     <Box sx={{ py: 1 }}>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+      <Typography
+        variant="body2"
+        sx={{
+          color: "text.secondary",
+          mb: 2
+        }}>
         {t(
           'settings.monicaImport.connect.description',
           'Import your contacts, activities, notes, reminders and relationships from a running Monica instance. Create an API token in Monica under Settings → API.'
@@ -408,7 +418,13 @@ export default function MonicaImportDialog({
               }
               label={t('settings.monicaImport.connect.collapseReciprocal', 'Import each relationship only once')}
             />
-            <Typography variant="body2" color="text.secondary" sx={{ mt: -0.5, mb: 1 }}>
+            <Typography
+              variant="body2"
+              sx={{
+                color: "text.secondary",
+                mt: -0.5,
+                mb: 1
+              }}>
               {t(
                 'settings.monicaImport.connect.collapseReciprocalHelp',
                 'Monica saves every relationship on both contacts. Meerkat needs only one entry — the other contact shows it under "Incoming Relationships". Turn this off to create a separate entry on each contact, as Monica does.'
@@ -425,7 +441,12 @@ export default function MonicaImportDialog({
             label={t('settings.monicaImport.connect.includeExtras', 'Import calls, tasks, gifts and debts as notes')}
           />
 
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          <Typography
+            variant="body2"
+            sx={{
+              color: "text.secondary",
+              mt: 1
+            }}>
             {t('settings.monicaImport.connect.estimate', 'Estimated fetch time: about {{duration}} (Monica limits API requests)', {
               duration: formatDuration(
                 includeRelationships
@@ -452,7 +473,12 @@ export default function MonicaImportDialog({
             : t('settings.monicaImport.importingTitle', 'Downloading contact photos…')}
         </Typography>
         {phase && (
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+          <Typography
+            variant="body2"
+            sx={{
+              color: "text.secondary",
+              mb: 2
+            }}>
             {t(`settings.monicaImport.phase.${phase}`, phase)}
             {showDeterminate && ` (${status!.phase_done}/${status!.phase_total})`}
           </Typography>
@@ -462,7 +488,12 @@ export default function MonicaImportDialog({
           value={progress}
           sx={{ maxWidth: 400, mx: 'auto' }}
         />
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+        <Typography
+          variant="body2"
+          sx={{
+            color: "text.secondary",
+            mt: 2
+          }}>
           {mode === 'fetching'
             ? t('settings.monicaImport.keepOpenFetching', 'Keep this dialog open — closing it cancels the fetch.')
             : t('settings.monicaImport.keepOpenImporting', 'You can close this dialog — photos keep downloading on the server.')}
@@ -486,9 +517,15 @@ export default function MonicaImportDialog({
     if (row.related.relationships > 0) {
       parts.push(t('settings.monicaImport.review.relationships', '{{count}} relationships', { count: row.related.relationships }));
     }
-    if (parts.length === 0) return <Typography variant="body2" color="text.secondary">-</Typography>;
+    if (parts.length === 0) return (
+      <Typography variant="body2" sx={{
+        color: "text.secondary"
+      }}>-</Typography>
+    );
     return (
-      <Typography variant="body2" color="text.secondary">
+      <Typography variant="body2" sx={{
+        color: "text.secondary"
+      }}>
         {parts.join(', ')}
       </Typography>
     );
@@ -603,6 +640,74 @@ export default function MonicaImportDialog({
     );
   };
 
+  const renderIssues = (issues: MonicaImportIssue[]) => {
+    if (issues.length === 0) return null;
+
+    const byReason = new Map<string, MonicaImportIssue[]>();
+    for (const issue of issues) {
+      byReason.set(issue.reason, [...(byReason.get(issue.reason) ?? []), issue]);
+    }
+
+    return (
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="subtitle2" gutterBottom>
+          {t('settings.monicaImport.result.issues.title', 'Skipped and failed items ({{count}})', { count: issues.length })}
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{
+            color: "text.secondary",
+            mb: 1
+          }}>
+          {t('settings.monicaImport.result.issues.hint', 'Every Monica record that was not imported, or was imported without part of its data, grouped by reason.')}
+        </Typography>
+        {[...byReason.entries()].map(([reason, group]) => (
+          // Unmounted while collapsed: a re-import can list thousands of rows.
+          <Accordion key={reason} disableGutters variant="outlined" slotProps={{ transition: { unmountOnExit: true } }}>
+            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+              <Typography variant="body2" color={group.some((i) => i.status === 'failed') ? 'error' : 'text.primary'}>
+                {t(`settings.monicaImport.result.issues.reasons.${reason}`, reason)} ({group.length})
+              </Typography>
+            </AccordionSummary>
+            <AccordionDetails sx={{ p: 0 }}>
+              <TableContainer sx={{ maxHeight: 320 }}>
+                <Table size="small" stickyHeader>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>{t('settings.monicaImport.result.issues.columns.type', 'Type')}</TableCell>
+                      <TableCell>{t('settings.monicaImport.result.issues.columns.contact', 'Contact')}</TableCell>
+                      <TableCell>{t('settings.monicaImport.result.issues.columns.item', 'Item')}</TableCell>
+                      <TableCell>{t('settings.monicaImport.result.issues.columns.details', 'Details')}</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {group.map((issue, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          {t(`settings.monicaImport.result.issues.entities.${issue.entity}`, issue.entity)}
+                          {issue.status === 'failed' && (
+                            <Chip size="small" color="error" sx={{ ml: 1 }} label={t('settings.monicaImport.result.issues.failed', 'failed')} />
+                          )}
+                        </TableCell>
+                        <TableCell>{issue.contact || '—'}</TableCell>
+                        <TableCell>
+                          {issue.count && issue.count > 1
+                            ? t('settings.monicaImport.result.issues.rolledUp', '{{count}} items', { count: issue.count })
+                            : issue.label || '—'}
+                        </TableCell>
+                        <TableCell>{issue.detail || ''}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </AccordionDetails>
+          </Accordion>
+        ))}
+      </Box>
+    );
+  };
+
   const renderResultStep = () => {
     if (!result) return null;
 
@@ -632,22 +737,30 @@ export default function MonicaImportDialog({
             <WarningIcon color="warning" sx={{ verticalAlign: 'middle', mr: 1 }} />
             {t('contacts.import.result.updated', '{{count}} contacts updated', { count: result.updated })}
           </Typography>
-          <Typography color="text.secondary">
+          <Typography sx={{
+            color: "text.secondary"
+          }}>
             {t('contacts.import.result.skipped', '{{count}} rows skipped', { count: result.skipped })}
           </Typography>
           {relatedLines
             .filter(([, count]) => count > 0)
             .map(([label], index) => (
-              <Typography key={index} color="text.secondary">
+              <Typography key={index} sx={{
+                color: "text.secondary"
+              }}>
                 {label}
               </Typography>
             ))}
           {result.photos_failed > 0 && (
-            <Typography color="text.secondary">
+            <Typography sx={{
+              color: "text.secondary"
+            }}>
               {t('settings.monicaImport.result.photosFailed', '{{count}} photos could not be downloaded', { count: result.photos_failed })}
             </Typography>
           )}
         </Box>
+
+        {renderIssues(result.issues ?? [])}
 
         {result.errors.length > 0 && (
           <Box sx={{ mt: 2 }}>
